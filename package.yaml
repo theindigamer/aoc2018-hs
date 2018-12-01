@@ -21,6 +21,33 @@ description:         Please see the README on GitHub at <https://github.com/thei
 dependencies:
 - base >= 4.7 && < 5
 - containers
+- megaparsec
+- text
+- unordered-containers
+- bytestring
+- hashable
+
+default-extensions:
+- DeriveDataTypeable
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- StandaloneDeriving
+- FlexibleInstances
+- FlexibleContexts
+- MultiParamTypeClasses
+- FunctionalDependencies
+- TypeApplications
+- TypeFamilies
+- ConstraintKinds
+- KindSignatures
+- BangPatterns
+- LambdaCase
+- MultiWayIf
+- TupleSections
+- OverloadedStrings
+- NamedFieldPuns
+- PatternSynonyms
 
 library:
   source-dirs: src
