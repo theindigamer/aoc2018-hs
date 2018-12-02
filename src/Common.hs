@@ -45,6 +45,9 @@ type PE = ParseError Char Void
 
 type MonadChar e s m = (MonadParsec e s m, Token s ~ Char)
 
+linewise :: Show a => IO String -> ([String] -> a) -> IO ()
+linewise a f = a >>= print . f . lines
+
 space :: MonadChar e s m => m ()
 space = L.space C.space1 empty empty
 
