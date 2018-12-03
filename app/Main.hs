@@ -2,6 +2,7 @@ module Main where
 
 import Dec01
 import Dec02
+import Dec03
 
 main :: IO ()
-main = dec02P2
+main = dec03P2
