@@ -5,6 +5,7 @@
 module Common
   ( module Common
   , module Text.Megaparsec
+  , module Control.Arrow
   , module Control.Monad
   , module Data.Coerce
   , module Data.String
@@ -22,6 +23,7 @@ module Common
 
 import Data.Void (Void)
 
+import Control.Arrow (first, second, (&&&))
 import Control.Applicative (Alternative)
 import Control.Monad
 import Data.Coerce
