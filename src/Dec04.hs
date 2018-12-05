@@ -10,6 +10,7 @@ import Debug.Trace
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.List as List
+import qualified Data.OccMap as OM
 import qualified Text.Megaparsec.Char as C
 
 data GuardState = WakeUp | Sleep | Begin GuardId
@@ -50,9 +51,6 @@ entryP =
   <*> (C.char ':' *> signedIntP)
   <*> (C.string "] " *> guardStateP)
 
-oneOrPlusOne :: (Eq k, Hashable k) => k -> HashMap k Int -> HashMap k Int
-oneOrPlusOne = HM.alter (Just . maybe 1 (+ 1))
-
 minsAsleep :: Entry -> Entry -> [Int]
 minsAsleep sleep wake = [mins sleep .. mins wake - 1]
 
@@ -60,9 +58,9 @@ type GuardId = Int
 
 go
   :: (GuardId -> HashMap k v -> [Int] -> HashMap k v)
-  -> (HashMap k v, Maybe Entry, Maybe Int)
+  -> (HashMap k v, Maybe Entry, Maybe GuardId)
   -> Entry
-  -> (HashMap k v, Maybe Entry, Maybe Int)
+  -> (HashMap k v, Maybe Entry, Maybe GuardId)
 go f (h, prev, cur) e@Entry{info} = case info of
   Begin i -> (h, Nothing, Just i)
   Sleep -> (h, Just e, cur)
@@ -73,26 +71,26 @@ go f (h, prev, cur) e@Entry{info} = case info of
 dec04P1 :: IO ()
 dec04P1 =
   linewise (readFile "data/dec04.txt") $
-      map (justParse entryP)
-      .> List.sort
-      .> List.foldl' (go f) (HM.empty, Nothing, Nothing)
-      .> (\(x, y, z) -> x)
-      .> HM.toList
-      .> map (second (\(HM.toList -> xs) -> (sum $ map snd xs, xs)))
-      .> List.maximumBy (compare `on` snd)
-      .> second (List.maximumBy (compare `on` snd) . snd)
+    map (justParse entryP)
+    .> List.sort
+    .> List.foldl' (go f) (HM.empty, Nothing, Nothing)
+    .> (\(x, y, z) -> x)
+    .> HM.toList
+    .> map (second (\(HM.toList -> xs) -> (sum $ map snd xs, xs)))
+    .> List.maximumBy (compare `on` snd)
+    .> second (List.maximumBy (compare `on` snd) . snd)
   where
     f i = foldl' $ \h m -> HM.alter
-        (Just . maybe (HM.fromList [(m, 1)]) (oneOrPlusOne m)) i h
+        (Just . maybe (HM.fromList [(m, 1)]) (OM.insert m)) i h
 
 dec04P2 :: IO ()
 dec04P2 =
   linewise (readFile "data/dec04.txt") $
-      map (justParse entryP)
-      .> List.sort
-      .> List.foldl' (go f) (HM.empty, Nothing, Nothing)
-      .> (\(x, y, z) -> x)
-      .> HM.toList
-      .> List.maximumBy (compare `on` snd)
+    map (justParse entryP)
+    .> List.sort
+    .> List.foldl' (go f) (HM.empty, Nothing, Nothing)
+    .> (\(x, y, z) -> x)
+    .> HM.toList
+    .> List.maximumBy (compare `on` snd)
   where
-    f i = foldl' $ \h m -> oneOrPlusOne (i, m) h
+    f i = foldl' $ \h m -> OM.insert (i, m) h
