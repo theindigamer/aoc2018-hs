@@ -18,6 +18,8 @@ module Common
   , HashMap
   , HashSet
   , Map
+  , on
+  , comparing
   )
   where
 
@@ -26,12 +28,15 @@ import Data.Void (Void)
 import Control.Arrow (first, second, (&&&))
 import Control.Applicative (Alternative)
 import Control.Monad
+import Data.Function (on)
+import Data.Ord (comparing)
 import Data.Coerce
 import Data.String (IsString (..))
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Monoid
 import Data.Foldable
 import Text.Megaparsec
+import qualified Data.List as List
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -46,6 +51,12 @@ type Parser s = Parsec Void s
 type PE = ParseError Char Void
 
 type MonadChar e s m = (MonadParsec e s m, Token s ~ Char)
+
+maxBySnd :: Ord b => [(a, b)] -> (a, b)
+maxBySnd = List.maximumBy (comparing snd)
+
+maxByFst :: Ord a => [(a, b)] -> (a, b)
+maxByFst = List.maximumBy (comparing fst)
 
 linewise :: Show a => IO String -> ([String] -> a) -> IO ()
 linewise a f = a >>= print . f . lines

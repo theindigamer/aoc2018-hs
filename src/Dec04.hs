@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Dec04 where
 
 import Common
@@ -55,9 +54,10 @@ minsAsleep :: Entry -> Entry -> [Int]
 minsAsleep sleep wake = [mins sleep .. mins wake - 1]
 
 type GuardId = Int
+type Minute = Int
 
 go
-  :: (GuardId -> HashMap k v -> [Int] -> HashMap k v)
+  :: (GuardId -> HashMap k v -> [Minute] -> HashMap k v)
   -> (HashMap k v, Maybe Entry, Maybe GuardId)
   -> Entry
   -> (HashMap k v, Maybe Entry, Maybe GuardId)
@@ -68,29 +68,31 @@ go f (h, prev, cur) e@Entry{info} = case info of
     (Just p, Just i) -> (f i h (minsAsleep p e), Nothing, Just i)
     _ -> error "Unreachable"
 
-dec04P1 :: IO ()
-dec04P1 =
+dec04Common
+  :: (Eq k, Hashable k, Show a)
+  => (GuardId -> HashMap k v -> [Minute] -> HashMap k v)
+  -> ([(k, v)] -> a)
+  -> IO ()
+dec04Common f g =
   linewise (readFile "data/dec04.txt") $
     map (justParse entryP)
     .> List.sort
     .> List.foldl' (go f) (HM.empty, Nothing, Nothing)
     .> (\(x, y, z) -> x)
     .> HM.toList
-    .> map (second (\(HM.toList -> xs) -> (sum $ map snd xs, xs)))
-    .> List.maximumBy (compare `on` snd)
-    .> second (List.maximumBy (compare `on` snd) . snd)
+    .> g
+
+dec04P1 :: IO ()
+dec04P1 =
+  dec04Common f $
+    map (second (HM.toList .> ((map snd .> sum) &&& id)))
+    .> maxBySnd
+    .> second (snd .> maxBySnd)
   where
     f i = foldl' $ \h m -> HM.alter
         (Just . maybe (HM.fromList [(m, 1)]) (OM.insert m)) i h
 
 dec04P2 :: IO ()
-dec04P2 =
-  linewise (readFile "data/dec04.txt") $
-    map (justParse entryP)
-    .> List.sort
-    .> List.foldl' (go f) (HM.empty, Nothing, Nothing)
-    .> (\(x, y, z) -> x)
-    .> HM.toList
-    .> List.maximumBy (compare `on` snd)
+dec04P2 = dec04Common f maxBySnd
   where
     f i = foldl' $ \h m -> OM.insert (i, m) h
