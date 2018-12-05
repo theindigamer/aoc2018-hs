@@ -4,6 +4,7 @@ import Dec01
 import Dec02
 import Dec03
 import Dec04
+import Dec05
 
 main :: IO ()
-main = dec04P2
+main = dec05P2
