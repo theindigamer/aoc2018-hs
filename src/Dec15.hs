@@ -7,7 +7,6 @@ module Dec15 (dec15) where
 import Common
 
 import Control.Exception (assert)
-import Data.Functor (($>))
 import Data.List (sortOn)
 import Data.IORef (writeIORef, readIORef, newIORef, IORef)
 import Data.Maybe (fromMaybe, fromJust, isJust, catMaybes, mapMaybe)
@@ -62,33 +61,17 @@ instance {-# OVERLAPPING #-} Show (Cave a) where
         E _ -> 'E'
         C -> '.'
         W -> '#'
--- print' :: Cave Id -> IO ()
--- print' = showExploded .> putStrLn
--- showExploded :: Cave Id -> String
--- showExploded = fmap showrow .> toList .> unlines
---   where
---     padl s = if length s < 3 then replicate (3 - length s) ' ' ++ s else s
---     showrow = toList .> concatMap showX
---     showU = \case
---       G i -> padl ('G' : show i)
---       E j -> padl ('E' : show j)
---       C -> " . "
---       W -> " # "
 
 caveP :: Parser String (Cave ())
-caveP = Seq.fromList <$> some caveLineP
+caveP = Seq.fromList <$> some (Seq.fromList <$> (some tileP <* C.space))
   where
-    caveLineP = Seq.fromList <$> (some xP <* C.space)
-    xP = C.char '#' $> W
-       <|> C.char '.' $> C
-       <|> C.char 'G' $> G ()
-       <|> C.char 'E' $> E ()
+    tileP =   W    <$ C.char '#'
+          <|> C    <$ C.char '.'
+          <|> G () <$ C.char 'G'
+          <|> E () <$ C.char 'E'
 
 data P = P{py, px :: !Int}
-  deriving (Eq, Ord)
-
-instance Show P where
-  show P{px, py} = show (px, py)
+  deriving (Show, Eq, Ord)
 
 at :: Cave a -> P -> Tile a
 at rows P{px, py} = (rows `Seq.index` py) `Seq.index` px
@@ -133,11 +116,10 @@ mkGraph c = loop id go c |> mconcat .> uncurry G.mkGraph
 
 -- Units, armies and combatants
 
-data Unit = Unit { pos :: P, hitPoints :: HitPoints }
-  deriving (Eq, Ord)
+type HitPoints = Word
 
-instance Show Unit where
-  show Unit{pos, hitPoints} = show pos ++ ",h=" ++ show hitPoints
+data Unit = Unit { pos :: P, hitPoints :: HitPoints }
+  deriving (Show, Eq, Ord)
 
 type Id = Int
 type IdMap = IntMap
@@ -195,8 +177,6 @@ updateCave c = (ges, update c)
 
 -- Play
 
-data Action = Attack Id | MoveAndAttack P (Maybe Id) | Noop
-
 data Distance = Finite !Word | Infinite
   deriving (Eq, Ord)
 
@@ -204,8 +184,6 @@ instance Show Distance where
   show = \case
     Finite i -> show i
     Infinite -> "Inf"
-
-type HitPoints = Word
 
 decideStep :: CaveGraph -> P -> Set P -> Maybe (Distance, P)
 decideStep gr currentP =
@@ -225,16 +203,18 @@ decideStep gr currentP =
                            let dist = distance nbr targetP
                          ]
 
-decideAction :: Id -> Combatants -> Cave Id -> Action
-decideAction i ges@Combatants{goblins, elves} cave
-  | ut == Goblin && IM.null elves   = Noop
-  | ut == Elf    && IM.null goblins = Noop
+turn :: Id -> Combatants -> Cave Id -> (Combatants, Cave Id)
+turn i ges@Combatants{goblins, elves} cave
+  | IM.null elves || IM.null goblins
+    || (i `IM.notMember` goblins && i `IM.notMember` elves) = (ges, cave)
+  -- still alive and enemies are present
   | otherwise = case best_path_info of
-    Just (Finite 0, curPos)    -> Attack (pickEnemy curPos)
-    Just (Finite 1, attackPos) -> MoveAndAttack attackPos (Just (pickEnemy attackPos))
-    Just (Finite _, stepPos)   -> MoveAndAttack stepPos   Nothing
-    Just (Infinite, _)         -> Noop
-    Nothing                    -> Noop
+    Just (Finite 0, curPos)    -> attack (pickEnemy curPos) ges cave
+    Just (Finite 1, attackPos) -> uncurry (attack (pickEnemy attackPos))
+                                  (applyMove attackPos i ges cave)
+    Just (Finite _, stepPos)   -> applyMove stepPos i ges cave
+    Just (Infinite, _)         -> (ges, cave)
+    Nothing                    -> (ges, cave)
   where
     best_path_info
       | i_pos `Set.member` enemy_adjs = Just (Finite 0, i_pos)
@@ -273,18 +253,16 @@ attack i_underAttack ges c = case go comrades of
   Kill loc army -> (setArmy army ges, unsafeCleanupCorpse loc c)
   NoKill army -> (setArmy army ges, c)
   where
+    go = IM.alterF (fromMaybe err .> landHit) i_underAttack
+    comrades = getComrades ut ges
     setArmy ar = modifyArmy ut (const ar)
     damage = attackPower (enemy ut)
-    landHit :: Unit -> KillCam P (Maybe Unit)
     landHit un@Unit{hitPoints} =
       if hitPoints < damage
       then Kill (pos <| comrades IM.! i_underAttack) Nothing
       else NoKill (Just un{hitPoints = hitPoints - damage})
     err = error ("Expected " ++ show ut ++ " in map")
-    go :: Army -> KillCam P Army
-    go = IM.alterF (fromMaybe err .> landHit) i_underAttack
     ut = if isGoblin i_underAttack ges then Goblin else Elf
-    comrades = getComrades ut ges
 
 applyMove :: P -> Id -> Combatants -> Cave Id -> (Combatants, Cave Id)
 applyMove p' i ges c = (comb', c')
@@ -295,27 +273,13 @@ applyMove p' i ges c = (comb', c')
     comb' = modifyArmy ut (IM.insert i Unit{pos=p', hitPoints}) ges
     c' = c |> reset C pos |> reset (if ut == Goblin then G i else E i) p'
 
-turn :: (Combatants, Cave Id) -> Id -> (Combatants, Cave Id)
-turn (ges, c) i =
-  if stillAlive then
-    case decideAction i ges c of
-      Attack j                 -> attack j ges c
-      MoveAndAttack m Nothing  -> applyMove m i ges c
-      MoveAndAttack m (Just j) -> uncurry (attack j) (applyMove m i ges c)
-      Noop                     -> (ges, c)
-  else (ges, c)
-  where
-    stillAlive
-      | isGoblin i ges = i `IM.member` goblins ges
-      | otherwise      = i `IM.member` elves ges
-
 oneRound :: [Id] -> Combatants -> Cave Id -> (Bool, Combatants, Cave Id)
 oneRound = go
   where
     go [] combs cave = (True, combs, cave)
     go (i:ids) combs@Combatants{elves, goblins} cave
       | IM.null elves || IM.null goblins = (False, combs, cave)
-      | otherwise = uncurry (go ids) (turn (combs, cave) i)
+      | otherwise = uncurry (go ids) (turn i combs cave)
 
 getPlayOrder :: Combatants -> [Id]
 getPlayOrder Combatants{goblins, elves} =
