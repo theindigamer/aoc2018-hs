@@ -27,6 +27,12 @@ dependencies:
 - bytestring
 - hashable
 - text-metrics
+- vector
+- mtl
+- transformers
+- data-clist
+- primitive
+- fgl
 
 default-extensions:
 - DeriveDataTypeable
@@ -49,6 +55,10 @@ default-extensions:
 - OverloadedStrings
 - NamedFieldPuns
 - PatternSynonyms
+
+ghc-options:
+- -Wall
+- -O2
 
 library:
   source-dirs: src

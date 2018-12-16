@@ -91,6 +91,6 @@ dec06P2 = linewise (readFile "data/dec06.txt") $
      in [0 ..]
         |> map (deltas (C xmid ymid) .> filter (sumDist .> (< d)))
         |> takeWhile (not . null)
-        |> map (nub .> length)
+        |> map (nub .> length) -- nub to remove duplicates for delta = 0
         |> sum
   )

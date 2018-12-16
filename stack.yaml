@@ -37,7 +37,8 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
+extra-deps:
+- ghc-prof-aeson-0.1.0.0@sha256:fc88188478f158fd2c64b46087e092d42594415dedab21ebea41967d1615e6c7
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
